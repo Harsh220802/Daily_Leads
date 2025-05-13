@@ -7,6 +7,7 @@ import numpy as np
 import base64
 import requests
 from io import StringIO
+from dateutil import parser
 
 st.set_page_config(layout="wide", page_title="Leads Analysis Dashboard", page_icon="📊")
 
@@ -36,31 +37,46 @@ def clean_data(df):
     df_clean = df.copy()
     date_columns = [col for col in df_clean.columns if 'date' in col.lower()]
     for col in date_columns:
-        # Try multiple datetime formats to handle different time formats
-        date_formats = [
-            '%d/%m/%Y, %H:%M:%S',    # Format: 11/05/2025, 00:04:34
-            '%d/%m/%Y, %I:%M:%S %p', # Format: 12/05/2025, 11:58:06 PM
-            '%d/%m/%Y %H:%M:%S',
-            '%d/%m/%Y %I:%M:%S %p',
-            '%d/%m/%Y'
-        ]
-        
-        for format in date_formats:
-            try:
-                df_clean[col] = pd.to_datetime(df_clean[col], format=format, errors='coerce')
-                # If successful conversion (no NaT values), break the loop
-                if not pd.isna(df_clean[col]).all():
-                    break
-            except:
-                continue
-                
-        # If still not converted, try automatic parsing as last resort
-        if pd.isna(df_clean[col]).all():
-            try:
-                df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce')
-            except:
-                pass
-                    
+        try:
+            sample_date = df_clean[col].iloc[0] if not df_clean[col].empty else None
+            if sample_date:
+                st.write(f"Sample date from {col}: {sample_date}")
+            date_formats = [
+                '%d/%m/%Y, %H:%M:%S',      # 24-hour: 12/05/2025, 23:57:03
+                '%d/%m/%Y, %I:%M:%S %p',   # 12-hour: 12/05/2025, 11:58:06 PM
+                '%d/%m/%Y',                # 12/05/2025
+                '%Y-%m-%d %H:%M:%S',       # 2025-05-12 23:57:03
+                '%Y-%m-%d',                # 2025-05-12
+                '%d-%m-%Y',                # 12-05-2025
+                '%d-%m-%Y %H:%M:%S',       # 12-05-2025 23:57:03
+                '%m/%d/%Y',                # 05/12/2025
+                '%m/%d/%Y %H:%M:%S',       # 05/12/2025 23:57:03
+                '%m/%d/%Y, %I:%M:%S %p'    # 05/12/2025, 11:58:06 PM
+            ]
+            def try_parse_date(val):
+                if pd.isnull(val):
+                    return pd.NaT
+                for fmt in date_formats:
+                    try:
+                        return pd.to_datetime(val, format=fmt)
+                    except Exception:
+                        continue
+                try:
+                    return parser.parse(str(val))
+                except Exception:
+                    return pd.NaT
+            df_clean[col] = df_clean[col].apply(try_parse_date)
+            total_rows = len(df_clean)
+            parsed_rows = df_clean[col].notna().sum()
+            if parsed_rows < total_rows:
+                st.warning(f"Could not parse {total_rows - parsed_rows} dates in column {col}")
+                # Show a few unparsed samples for debugging
+                unparsed_samples = df[col][df_clean[col].isna()].dropna().unique()[:5]
+                if len(unparsed_samples) > 0:
+                    st.info(f"Sample unparsed dates in {col}: {list(unparsed_samples)}")
+        except Exception as e:
+            st.error(f"Error parsing dates in column {col}: {str(e)}")
+            pass
     # Rest of the function remains the same
     rename_dict = {}
     for col in df_clean.columns:
@@ -280,26 +296,7 @@ if load_button or ('data_loaded' in st.session_state and st.session_state.data_l
             st.sidebar.subheader("Date Filters")
             if filtered_df['User Registration Date'].dtype != 'datetime64[ns]':
                 try:
-                    # Try multiple formats for date conversion if needed
-                    date_formats = [
-                        '%d/%m/%Y, %H:%M:%S',
-                        '%d/%m/%Y, %I:%M:%S %p',
-                        '%d/%m/%Y %H:%M:%S',
-                        '%d/%m/%Y %I:%M:%S %p',
-                        '%d/%m/%Y'
-                    ]
-                    
-                    for format in date_formats:
-                        try:
-                            filtered_df['User Registration Date'] = pd.to_datetime(filtered_df['User Registration Date'], format=format, errors='coerce')
-                            if not pd.isna(filtered_df['User Registration Date']).all():
-                                break
-                        except:
-                            continue
-                            
-                    # Last resort - try automatic parsing
-                    if pd.isna(filtered_df['User Registration Date']).all():
-                        filtered_df['User Registration Date'] = pd.to_datetime(filtered_df['User Registration Date'], errors='coerce')
+                    filtered_df['User Registration Date'] = pd.to_datetime(filtered_df['User Registration Date'], format='%d/%m/%Y', errors='coerce')
                 except:
                     st.sidebar.warning("Could not convert date column to datetime format")
             if pd.api.types.is_datetime64_dtype(filtered_df['User Registration Date']):
@@ -581,7 +578,7 @@ if load_button or ('data_loaded' in st.session_state and st.session_state.data_l
                 fig.update_traces(
                     textposition='inside',
                     textinfo='percent+label'
-                )                
+                )               
                 fig.update_layout(
                     legend=dict(orientation="h", yanchor="bottom", y=-0.2),
                     margin=dict(l=20, r=20, t=30, b=0),
