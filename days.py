@@ -425,27 +425,24 @@ if load_button or ('data_loaded' in st.session_state and st.session_state.data_l
                 st.plotly_chart(fig, use_container_width=True)        
             with tabs[1]:
                 if campaign_conversion_data is not None:
-                    # Add user input for minimum number of leads
+                    st.write("DEBUG: campaign_conversion_data columns", campaign_conversion_data.columns.tolist())
+                    st.write("DEBUG: campaign_conversion_data head", campaign_conversion_data.head())
                     min_leads = st.number_input(
                         "Minimum number of leads for campaign to be shown",
                         min_value=1,
                         value=5,
                         step=1
                     )
-
-                    # Filter campaigns based on user input
                     filtered_conversion_campaigns = campaign_conversion_data[campaign_conversion_data['total'] >= min_leads].copy()
+                    st.write("DEBUG: filtered_conversion_campaigns", filtered_conversion_campaigns)
                     if not filtered_conversion_campaigns.empty:
                         st.subheader("Campaigns by Conversion Rate")
-                        # Calculate percentage of completed
                         filtered_conversion_campaigns['percentage_completed'] = (
                             filtered_conversion_campaigns['completed'] / filtered_conversion_campaigns['total'] * 100
                         ).round(1)
-                        # Display the table with required columns
                         display_df = filtered_conversion_campaigns[['campaign', 'completed', 'total', 'percentage_completed']]
                         display_df = display_df.rename(columns={'percentage_completed': 'Completed %'})
                         st.dataframe(display_df, hide_index=True)
-                        # Optionally, keep the bar chart below
                         fig = px.bar(
                             filtered_conversion_campaigns,
                             x='campaign',
