@@ -425,32 +425,47 @@ if load_button or ('data_loaded' in st.session_state and st.session_state.data_l
                 st.plotly_chart(fig, use_container_width=True)        
             with tabs[1]:
                 if campaign_conversion_data is not None:
+                    # Add user input for minimum number of leads
+                    min_leads = st.number_input(
+                        "Minimum number of leads for campaign to be shown",
+                        min_value=1,
+                        value=5,
+                        step=1
+                    )
 
-                    top_conversion_campaigns = campaign_conversion_data[campaign_conversion_data['total'] >= 5].sort_values('conversion_rate', ascending=False).head(10)                   
-                    if not top_conversion_campaigns.empty:
+                    # Filter campaigns based on user input
+                    filtered_conversion_campaigns = campaign_conversion_data[campaign_conversion_data['total'] >= min_leads].copy()
+                    if not filtered_conversion_campaigns.empty:
                         st.subheader("Campaigns by Conversion Rate")
-                        display_df = top_conversion_campaigns[['campaign', 'completed', 'total']]
+                        # Calculate percentage of completed
+                        filtered_conversion_campaigns['percentage_completed'] = (
+                            filtered_conversion_campaigns['completed'] / filtered_conversion_campaigns['total'] * 100
+                        ).round(1)
+                        # Display the table with required columns
+                        display_df = filtered_conversion_campaigns[['campaign', 'completed', 'total', 'percentage_completed']]
+                        display_df = display_df.rename(columns={'percentage_completed': 'Completed %'})
                         st.dataframe(display_df, hide_index=True)
+                        # Optionally, keep the bar chart below
                         fig = px.bar(
-                            top_conversion_campaigns,
+                            filtered_conversion_campaigns,
                             x='campaign',
-                            y='conversion_rate',
-                            text='conversion_rate',
-                            title="Top 10 Campaigns by Conversion Rate (minimum 5 leads)"
-                        )                      
+                            y='percentage_completed',
+                            text='percentage_completed',
+                            title=f"Top Campaigns by Conversion Rate (minimum {min_leads} leads)"
+                        )
                         fig.update_layout(
                             xaxis_title="Campaign",
                             yaxis_title="Conversion Rate (%)",
                             xaxis_tickangle=-45
-                        )                      
+                        )
                         fig.update_traces(
                             texttemplate='%{text:.1f}%',
                             textposition='outside',
                             marker_color='green'
-                        )                      
+                        )
                         st.plotly_chart(fig, use_container_width=True)
                     else:
-                        st.info("Not enough data to show conversion rates.")
+                        st.info("No campaigns meet the minimum leads criteria.")
                 else:
                     st.info("Conversion data not available.")          
             with tabs[2]:
