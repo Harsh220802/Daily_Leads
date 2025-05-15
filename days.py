@@ -425,8 +425,6 @@ if load_button or ('data_loaded' in st.session_state and st.session_state.data_l
                 st.plotly_chart(fig, use_container_width=True)        
             with tabs[1]:
                 if campaign_conversion_data is not None:
-                    st.write("DEBUG: campaign_conversion_data columns", campaign_conversion_data.columns.tolist())
-                    st.write("DEBUG: campaign_conversion_data head", campaign_conversion_data.head())
                     min_leads = st.number_input(
                         "Minimum number of leads for campaign to be shown",
                         min_value=1,
@@ -434,7 +432,6 @@ if load_button or ('data_loaded' in st.session_state and st.session_state.data_l
                         step=1
                     )
                     filtered_conversion_campaigns = campaign_conversion_data[campaign_conversion_data['total'] >= min_leads].copy()
-                    st.write("DEBUG: filtered_conversion_campaigns", filtered_conversion_campaigns)
                     if not filtered_conversion_campaigns.empty:
                         st.subheader("Campaigns by Conversion Rate")
                         filtered_conversion_campaigns['percentage_completed'] = (
